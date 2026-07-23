@@ -35,7 +35,9 @@
     "build": "tsup src/index.ts --format esm --dts --clean",
     "test": "vitest run",
     "test:watch": "vitest",
-    "examples": "npm run build && npx --yes serve . -l 5000",
+    "dev": "vite",
+    "build:examples": "vite build",
+    "preview:examples": "vite preview",
     "release": "npm run test && npm run build && npm publish"
   },
   "peerDependencies": {
@@ -47,6 +49,7 @@
     "mermaid": "^11",
     "tsup": "^8",
     "typescript": "^5",
+    "vite": "^5",
     "vitest": "^2"
   },
   "allowScripts": {

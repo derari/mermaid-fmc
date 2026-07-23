@@ -75,19 +75,13 @@
         border-radius: 3px;
       }
     </style>
-    <script type="importmap">
-      {
-        "imports": {
-          "mermaid": "https://esm.sh/mermaid@11",
-          "elkjs/lib/elk.bundled.js": "https://esm.sh/elkjs@0.12/lib/elk.bundled.js",
-          "@iconify/utils": "https://esm.sh/@iconify/utils@2"
-        }
-      }
-    </script>
   </head>
   <body>
     <h1>mermaid-fmc playground</h1>
-    <p>Edit <code>examples/cases.js</code>, then refresh. Served from the built <code>dist/</code>.</p>
+    <p>
+      Edit <code>examples/cases.js</code>, then refresh.
+      See also the <a href="./editor.html">live editor</a>.
+    </p>
     <p class="filter-note">
       Tip: add <code>?select=icon</code> to the URL to show only examples matching a
       (case-insensitive) regex.
@@ -100,7 +94,7 @@
 
     <script type="module">
       import mermaid from 'mermaid';
-      import fmc, { registerIconPacks } from '../dist/index.js';
+      import fmc, { registerIconPacks } from '../src/index.ts';
       import { cases } from './cases.js';
 
       mermaid.registerExternalDiagrams([fmc]);

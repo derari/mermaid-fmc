@@ -898,15 +898,27 @@ npm run test:watch
 
 ## Visual playground
 
+Live at **https://derari.github.io/mermaid-fmc/** (the [playground](https://derari.github.io/mermaid-fmc/)
+and [editor](https://derari.github.io/mermaid-fmc/editor.html)), published from
+`examples/` on every push to `main` by [`.github/workflows/pages.yml`](.github/workflows/pages.yml).
+
+To run it locally:
+
 ```bash
-npm run examples   # builds dist/, then serves the project on :5000
+npm run dev              # Vite dev server on :5173
 ```
 
-Open **http://localhost:5000/examples/** — note the **trailing slash**. Without
-it the static server redirects to `/examples` and relative imports resolve
-against the site root instead of the `examples/` folder.
+- **http://localhost:5173/** — the playground (`examples/index.html`)
+- **http://localhost:5173/editor.html** — the live editor
 
-Add cases to `examples/cases.js` and refresh to eyeball new features.
+The pages import the library straight from `src/` (TypeScript), so editing
+either `examples/cases.js` or the library source and refreshing is enough — **no
+rebuild needed**. Add cases to `examples/cases.js` to eyeball new features.
+
+```bash
+npm run build:examples   # bundle the two pages into site/ (what Pages serves)
+npm run preview:examples # serve that build locally to sanity-check it
+```
 
 ## Build & release
 
