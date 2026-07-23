@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mermaid-fmc playground</title>
+    <style>
+      body {
+        font-family: 'trebuchet ms', sans-serif;
+        margin: 2rem;
+        color: #222;
+      }
+      h1 {
+        font-size: 1.3rem;
+      }
+      .case {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        margin: 1rem 0;
+        padding: 1rem;
+      }
+      .case h2 {
+        font-size: 1rem;
+        margin: 0 0 0.5rem;
+      }
+      .case pre {
+        background: #f6f6f6;
+        padding: 0.5rem 0.75rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        overflow-x: auto;
+      }
+      .render {
+        margin-top: 0.75rem;
+      }
+      .error {
+        color: #b00;
+        white-space: pre-wrap;
+      }
+      .toc {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        margin: 1rem 0;
+        padding: 0.75rem 1rem;
+        background: #fafafa;
+      }
+      .toc h2 {
+        font-size: 0.95rem;
+        margin: 0 0 0.5rem;
+      }
+      .toc ul {
+        margin: 0;
+        padding-left: 1.25rem;
+      }
+      .toc ul.two-col {
+        columns: 2;
+      }
+      .toc a {
+        color: #06c;
+        text-decoration: none;
+      }
+      .toc a:hover {
+        text-decoration: underline;
+      }
+      .toc .pending {
+        color: #999;
+      }
+      .filter-note {
+        color: #666;
+        font-size: 0.85rem;
+      }
+      .filter-note code {
+        background: #f0f0f0;
+        padding: 0 0.25rem;
+        border-radius: 3px;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "mermaid": "https://esm.sh/mermaid@11",
+          "elkjs/lib/elk.bundled.js": "https://esm.sh/elkjs@0.12/lib/elk.bundled.js",
+          "@iconify/utils": "https://esm.sh/@iconify/utils@2"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <h1>mermaid-fmc playground</h1>
+    <p>Edit <code>examples/cases.js</code>, then refresh. Served from the built <code>dist/</code>.</p>
+    <p class="filter-note">
+      Tip: add <code>?select=icon</code> to the URL to show only examples matching a
+      (case-insensitive) regex.
+    </p>
+    <div id="toc" class="toc" hidden>
+      <h2>Examples</h2>
+      <ul id="toc-list"></ul>
+    </div>
+    <div id="cases"></div>
+
+    <script type="module">
+      import mermaid from 'mermaid';
+      import fmc, { registerIconPacks } from '../dist/index.js';
+      import { cases } from './cases.js';
+
+      mermaid.registerExternalDiagrams([fmc]);
+      mermaid.initialize({ startOnLoad: false });
+
+      // Icons: register a small, coherent Iconify pack (Lucide) that the `icon:`
+      // style prop can draw from. The loader is lazy — the ~single JSON fetch only
+      // happens on the first diagram that actually uses an icon.
+      registerIconPacks([
+        {
+          name: 'lucide',
+          loader: () =>
+            fetch('https://cdn.jsdelivr.net/npm/@iconify-json/lucide/icons.json').then((r) =>
+              r.json(),
+            ),
+        },
+      ]);
+
+      const container = document.getElementById('cases');
+      const tocList = document.getElementById('toc-list');
+
+      // Optional ?select=<regex> filter: keep only cases whose title or code
+      // matches the (case-insensitive) regex. Falls back to showing everything
+      // if the pattern is invalid.
+      const selectParam = new URLSearchParams(location.search).get('select');
+      let selectRe = null;
+      if (selectParam) {
+        try {
+          selectRe = new RegExp(selectParam, 'i');
+        } catch (err) {
+          const note = document.createElement('p');
+          note.className = 'error';
+          note.textContent = `Invalid ?select regex: ${err.message}`;
+          container.before(note);
+        }
+      }
+
+      const slugCounts = new Map();
+      const slugFor = (title) => {
+        let base = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        if (!base) base = 'case';
+        const n = slugCounts.get(base) ?? 0;
+        slugCounts.set(base, n + 1);
+        return n === 0 ? base : `${base}-${n}`;
+      };
+
+      const visible = cases.filter(
+        (c) => !selectRe || selectRe.test(c.title) || selectRe.test(c.code),
+      );
+
+      if (visible.length) {
+        document.getElementById('toc').hidden = false;
+      }
+      if (visible.length >= 8) {
+        tocList.classList.add('two-col');
+      }
+
+      // Pass 1: lay out the whole page synchronously — every TOC entry (as a
+      // non-clickable placeholder) and every case skeleton — so the reader sees
+      // the full outline immediately, before any (potentially slow) render runs.
+      const items = visible.map((c, i) => {
+        const slug = slugFor(c.title);
+
+        const tocLabel = document.createElement('span');
+        tocLabel.className = 'pending';
+        tocLabel.textContent = c.title;
+        const li = document.createElement('li');
+        li.appendChild(tocLabel);
+        tocList.appendChild(li);
+
+        const section = document.createElement('div');
+        section.className = 'case';
+        section.id = slug;
+
+        const h2 = document.createElement('h2');
+        h2.textContent = c.title;
+        section.appendChild(h2);
+
+        const pre = document.createElement('pre');
+        pre.textContent = c.code;
+        section.appendChild(pre);
+
+        const render = document.createElement('div');
+        render.className = 'render';
+        section.appendChild(render);
+        container.appendChild(section);
+
+        return { c, i, slug, li, tocLabel, render };
+      });
+
+      // Pass 2: render each case; once it loads, swap its TOC placeholder for a
+      // real anchor so only loaded examples become clickable.
+      for (const { c, i, slug, li, tocLabel, render } of items) {
+        try {
+          const { svg } = await mermaid.render(`fmc-${i}`, c.code);
+          render.innerHTML = svg;
+        } catch (err) {
+          render.innerHTML = `<div class="error">${String(err && err.stack ? err.stack : err)}</div>`;
+        }
+
+        const link = document.createElement('a');
+        link.href = `#${slug}`;
+        link.textContent = c.title;
+        li.replaceChild(link, tocLabel);
+      }
+    </script>
+  </body>
+</html>

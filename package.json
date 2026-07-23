@@ -1,0 +1,45 @@
+{
+  "name": "mermaid-fmc",
+  "version": "0.0.1",
+  "description": "FMC (Fundamental Modeling Concepts) diagram type for Mermaid",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "examples": "npm run build && npx --yes serve . -l 5000",
+    "release": "npm run test && npm run build && npm publish"
+  },
+  "peerDependencies": {
+    "mermaid": "^11"
+  },
+  "devDependencies": {
+    "@iconify/types": "^2.0.0",
+    "@types/node": "^22",
+    "mermaid": "^11",
+    "tsup": "^8",
+    "typescript": "^5",
+    "vitest": "^2"
+  },
+  "allowScripts": {
+    "esbuild@0.27.7": true,
+    "esbuild@0.21.5": true
+  },
+  "dependencies": {
+    "@iconify/utils": "^3.1.4",
+    "elkjs": "^0.12.0"
+  }
+}

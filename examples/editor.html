@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mermaid-fmc editor</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        font-family: 'trebuchet ms', sans-serif;
+        color: #222;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 0.6rem 1rem;
+        border-bottom: 1px solid #ddd;
+        display: flex;
+        align-items: baseline;
+        gap: 1rem;
+      }
+      header h1 {
+        font-size: 1.1rem;
+        margin: 0;
+      }
+      header .hint {
+        font-size: 0.8rem;
+        color: #777;
+      }
+      main {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+      }
+      .pane {
+        flex: 1 1 50%;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .pane + .pane {
+        border-left: 1px solid #ddd;
+      }
+      .pane > .label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #999;
+        padding: 0.4rem 0.75rem;
+        border-bottom: 1px solid #eee;
+      }
+      #source {
+        flex: 1;
+        border: 0;
+        resize: none;
+        padding: 0.75rem 1rem;
+        font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+        font-size: 0.85rem;
+        line-height: 1.5;
+        tab-size: 2;
+        outline: none;
+      }
+      #output {
+        flex: 1;
+        overflow: auto;
+        padding: 1rem;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+      }
+      #output svg {
+        max-width: 100%;
+        height: auto;
+      }
+      .error {
+        color: #b00;
+        white-space: pre-wrap;
+        font-family: ui-monospace, monospace;
+        font-size: 0.8rem;
+        align-self: stretch;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "mermaid": "https://esm.sh/mermaid@11",
+          "elkjs/lib/elk.bundled.js": "https://esm.sh/elkjs@0.12/lib/elk.bundled.js",
+          "@iconify/utils": "https://esm.sh/@iconify/utils@2"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <header>
+      <h1>mermaid-fmc editor</h1>
+      <span class="hint">Edit on the left — the diagram re-renders as you type. Served from the built <code>dist/</code>.</span>
+    </header>
+    <main>
+      <section class="pane">
+        <div class="label">FMC source</div>
+        <textarea id="source" spellcheck="false"></textarea>
+      </section>
+      <section class="pane">
+        <div class="label">Rendered output</div>
+        <div id="output"></div>
+      </section>
+    </main>
+
+    <script type="module">
+      import mermaid from 'mermaid';
+      import fmc, { registerIconPacks } from '../dist/index.js';
+
+      mermaid.registerExternalDiagrams([fmc]);
+      // Icons: a small Iconify pack (Lucide) the `icon:` style prop draws from.
+      // The loader is lazy — fetched only once a diagram uses an icon.
+      registerIconPacks([
+        {
+          name: 'lucide',
+          loader: () =>
+            fetch('https://cdn.jsdelivr.net/npm/@iconify-json/lucide/icons.json').then((r) =>
+              r.json(),
+            ),
+        },
+      ]);
+      // suppressErrorRendering: on a parse error mermaid otherwise injects its
+      // "Syntax error in text" bomb SVG into a temp element it leaves in the DOM.
+      // With a fresh id per render those pile up and never clear — let our catch
+      // block below show the error text in the output pane instead.
+      mermaid.initialize({ startOnLoad: false, suppressErrorRendering: true });
+
+      // A single diagram that exercises most FMC features at once.
+      const EXAMPLE = `fmc LR
+  %% classDef: a reusable style bag. Props split on spaces, commas, or semicolons.
+  classDef critical tint:#b71c1c, stroke:#7f0000
+  classDef cache    fill:#fff3e0
+
+  %% ::: attaches a class inline on the declaration
+  actor Web Client:::critical
+
+  %% storage container with its own inner layout direction and nested entities
+  storage Backend
+    direction TB
+    actor API Gateway
+    variance Cache:::cache
+    storage Session Store
+      %% a bare style applies to the entity it is nested under
+      style tint:#1565c0
+
+  actor Worker
+    %% stroke is inherited by this node and the lines nested inside it
+    style stroke:#8e24aa
+
+  storage Data Lake
+  storage Archive
+
+  %% absolute lines connect an actor to a storage (across the two families)
+  Web Client --> Session Store
+  API Gateway <-- Cache
+  %% arrows may be any dash length
+  API Gateway ----------> Archive
+
+  %% complex line: a channel is auto-inserted between the two actors
+  Web Client --> o --> Worker
+    style stroke:#00897b, fill:#b2dfdb
+
+  %% complex line with a pipe (| glyph) between two storages
+  Data Lake --> | --> Archive
+
+  %% style/class a node by name, after it was declared
+  style Web Client shade:white
+  class Worker critical
+`;
+
+      const source = document.getElementById('source');
+      const output = document.getElementById('output');
+      source.value = EXAMPLE;
+
+      let seq = 0;
+      async function render() {
+        const id = `fmc-editor-${seq++}`;
+        try {
+          const { svg } = await mermaid.render(id, source.value);
+          output.innerHTML = svg;
+        } catch (err) {
+          output.innerHTML = `<div class="error">${String(
+            err && err.stack ? err.stack : err,
+          )}</div>`;
+        }
+      }
+
+      // Debounce so we render once the user pauses typing, not on every keystroke.
+      let timer;
+      source.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(render, 250);
+      });
+
+      render();
+    </script>
+  </body>
+</html>
