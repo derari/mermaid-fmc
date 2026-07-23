@@ -174,6 +174,16 @@ describe('treeDepth', () => {
     // deeper structure inside the region still contributes its own height.
     expect(treeDepth(actor('p', [region([actor('a', [actor('b')])])]))).toBe(2);
   });
+
+  it('treats an empty region as no content: its holder stays a leaf-level box', () => {
+    // A region with nothing in it is spliced out entirely, so a box holding only
+    // empty regions has no nested content and stays depth 0 (a plain leaf), not
+    // darkened as a container.
+    expect(treeDepth(actor('bob', [region()]))).toBe(0);
+    expect(treeDepth(actor('bob', [region(), region()]))).toBe(0);
+    // a region that does hold content still gives its holder a level.
+    expect(treeDepth(actor('bob', [region([actor('a')])]))).toBe(1);
+  });
 });
 
 describe('partitionRegions', () => {

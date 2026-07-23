@@ -23,14 +23,25 @@ export function tintFill(tint: string, shade: string, steps: number, k = 0.9): s
   return `color-mix(in srgb, ${tint} ${100 - shadePct}%, ${shade} ${shadePct}%)`;
 }
 
-// A node's subtree height, used to graduate its tint. A `region` is transparent
-// to the depth model: it contributes its children's height but adds no level of
-// its own, so wrapping content in regions never darkens the surrounding boxes
-// (an actor holding `region > actor` tints identically to one holding `actor`).
+// Whether an entity has any non-region node somewhere below it. Regions are
+// spliced out of the depth model, so a box whose whole subtree is regions (e.g.
+// it holds only an empty region) has no real content.
+function hasNonRegionDescendant(entity: Entity): boolean {
+  return entity.children.some((c) => c.subtype !== 'region' || hasNonRegionDescendant(c));
+}
+
+// A node's subtree height, used to graduate its tint. Regions are transparent to
+// depth — spliced out, as if their children were the parent's own: a region adds
+// no level of its own, and a `region > actor` subtree shades just like a bare
+// `actor`. A non-region container adds one level over its content, unless it has
+// no non-region descendant at all (it holds only empty regions): then there is
+// nothing nested inside it, so it stays a leaf-level box (depth 0) rather than
+// darkening as a container around empty space.
 export function treeDepth(entity: Entity): number {
   if (entity.children.length === 0) return 0;
   const base = Math.max(...entity.children.map(treeDepth));
-  return entity.subtype === 'region' ? base : base + 1;
+  if (entity.subtype === 'region') return base;
+  return hasNonRegionDescendant(entity) ? base + 1 : 0;
 }
 
 export interface Rect {
