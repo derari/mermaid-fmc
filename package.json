@@ -1,9 +1,24 @@
 {
   "name": "mermaid-fmc",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "FMC (Fundamental Modeling Concepts) diagram type for Mermaid",
   "type": "module",
   "license": "MIT",
+  "author": "derari",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/derari/mermaid-fmc.git"
+  },
+  "homepage": "https://github.com/derari/mermaid-fmc#readme",
+  "bugs": "https://github.com/derari/mermaid-fmc/issues",
+  "keywords": [
+    "mermaid",
+    "fmc",
+    "diagram",
+    "fundamental-modeling-concepts",
+    "architecture",
+    "block-diagram"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
