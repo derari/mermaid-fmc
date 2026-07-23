@@ -20,9 +20,15 @@ export interface RenderTheme extends ThemeDefaults {
   line: string;
 }
 
-// Reads the theme variables
-// `tint` darkens toward white on dark themes and black otherwise, so nested
-// fills stay legible in both.
+// Reads the theme variables into the renderer's palette.
+//
+// `shade` is the color a tint darkens toward as it nests, so nested fills stay
+// legible: it must contrast the background and flip between light and dark
+// themes. The theme's text/foreground color is exactly that — near-black on
+// light themes, near-white on dark — so we read `primaryTextColor` (then
+// `textColor`). This works for any theme, unlike keying off `darkMode`, which
+// Mermaid's built-in themes don't even expose in `themeVariables`; that boolean
+// is kept only as a last-resort fallback.
 export function renderTheme(): RenderTheme {
   const vars = getConfig?.()?.themeVariables ?? {};
   const str = (key: string, fallback: string): string => {
@@ -33,6 +39,6 @@ export function renderTheme(): RenderTheme {
     tint: str('mainBkg', str('primaryColor', '#fff')),
     stroke: str('nodeBorder', str('primaryBorderColor', '#333')),
     line: str('lineColor', '#333'),
-    shade: vars.darkMode === true ? 'white' : 'black',
+    shade: str('primaryTextColor', str('textColor', vars.darkMode === true ? 'white' : 'black')),
   };
 }

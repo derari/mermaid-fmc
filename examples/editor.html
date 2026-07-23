@@ -5,6 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>mermaid-fmc editor</title>
     <style>
+      /* Light is the default, independent of the OS/browser setting — no
+         prefers-color-scheme here. The toggle button flips html[data-theme]. */
+      :root {
+        color-scheme: light;
+        --bg: #fff;
+        --fg: #222;
+        --border: #ddd;
+        --border-faint: #eee;
+        --panel-bg: #fafafa;
+        --label: #999;
+        --hint: #777;
+        --faint: #999;
+        --error: #b00;
+      }
+      html[data-theme='dark'] {
+        color-scheme: dark;
+        --bg: #1a1a1a;
+        --fg: #e4e4e4;
+        --border: #444;
+        --border-faint: #333;
+        --panel-bg: #242424;
+        --label: #888;
+        --hint: #999;
+        --faint: #777;
+        --error: #ff8a8a;
+      }
       * {
         box-sizing: border-box;
       }
@@ -15,13 +41,14 @@
       }
       body {
         font-family: 'trebuchet ms', sans-serif;
-        color: #222;
+        color: var(--fg);
+        background: var(--bg);
         display: flex;
         flex-direction: column;
       }
       header {
         padding: 0.6rem 1rem;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--border);
         display: flex;
         align-items: baseline;
         gap: 1rem;
@@ -32,7 +59,22 @@
       }
       header .hint {
         font-size: 0.8rem;
-        color: #777;
+        color: var(--hint);
+      }
+      .theme-toggle {
+        margin-left: auto;
+        align-self: center;
+        font: inherit;
+        font-size: 0.8rem;
+        padding: 0.3rem 0.6rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel-bg);
+        color: var(--fg);
+        cursor: pointer;
+      }
+      .theme-toggle:hover {
+        border-color: var(--faint);
       }
       main {
         flex: 1;
@@ -46,21 +88,23 @@
         flex-direction: column;
       }
       .pane + .pane {
-        border-left: 1px solid #ddd;
+        border-left: 1px solid var(--border);
       }
       .pane > .label {
         font-size: 0.75rem;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        color: #999;
+        color: var(--label);
         padding: 0.4rem 0.75rem;
-        border-bottom: 1px solid #eee;
+        border-bottom: 1px solid var(--border-faint);
       }
       #source {
         flex: 1;
         border: 0;
         resize: none;
         padding: 0.75rem 1rem;
+        background: var(--bg);
+        color: var(--fg);
         font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
         font-size: 0.85rem;
         line-height: 1.5;
@@ -80,7 +124,7 @@
         height: auto;
       }
       .error {
-        color: #b00;
+        color: var(--error);
         white-space: pre-wrap;
         font-family: ui-monospace, monospace;
         font-size: 0.8rem;
@@ -92,6 +136,7 @@
     <header>
       <h1>mermaid-fmc editor</h1>
       <span class="hint">Edit on the left — the diagram re-renders as you type.</span>
+      <button id="theme-toggle" class="theme-toggle" type="button">🌙 Dark</button>
     </header>
     <main>
       <section class="pane">
@@ -109,22 +154,51 @@
       import fmc, { registerIconPacks } from '../src/index.ts';
 
       mermaid.registerExternalDiagrams([fmc]);
-      // Icons: a small Iconify pack (Lucide) the `icon:` style prop draws from.
-      // The loader is lazy — fetched only once a diagram uses an icon.
+      // Icons: register the Iconify packs the `icon:` style prop can draw from.
+      // `name` is the prefix used in `icon:<name>:<icon>`; the second arg is the
+      // `@iconify-json/<pkg>` package. Each loader is lazy — a pack's JSON is
+      // fetched only once a diagram actually uses an icon from it.
+      const iconPack = (name, pkg) => ({
+        name,
+        loader: () =>
+          fetch(`https://cdn.jsdelivr.net/npm/@iconify-json/${pkg}/icons.json`).then((r) =>
+            r.json(),
+          ),
+      });
       registerIconPacks([
-        {
-          name: 'lucide',
-          loader: () =>
-            fetch('https://cdn.jsdelivr.net/npm/@iconify-json/lucide/icons.json').then((r) =>
-              r.json(),
-            ),
-        },
+        iconPack('lucide', 'lucide'),
+        iconPack('nonicons', 'nonicons'),
+        iconPack('devicon', 'devicon-plain'),
+        iconPack('fa', 'fa7-regular'),
+        iconPack('fa-brands', 'fa7-brands'),
+        iconPack('mdi', 'mdi'),
       ]);
+      // fmc reads its palette from the resolved Mermaid theme (see src/theme.ts).
+      // Each mode sets the diagram-wide defaults to the equivalent of a root
+      // `style stroke:<c> tint:<c> shade:<c>`:
+      //   tint  ← mainBkg                          (base leaf fill)
+      //   stroke ← nodeBorder (node outlines) + lineColor (lines are separate)
+      //   shade ← white when darkMode === true, else black (the color tints darken
+      //           toward as they nest)
+      // So light  ≡ `style stroke:#111 tint:white shade:black`
+      //    dark   ≡ `style stroke:#eee tint:black shade:white`.
+      // `theme: 'base'` so our variables aren't recomputed.
+      const THEME_VARS = {
+        light: { darkMode: false, mainBkg: 'white', nodeBorder: '#111', lineColor: '#111' },
+        dark: { darkMode: true, mainBkg: '#111', nodeBorder: '#eee', lineColor: '#eee' },
+      };
       // suppressErrorRendering: on a parse error mermaid otherwise injects its
       // "Syntax error in text" bomb SVG into a temp element it leaves in the DOM.
       // With a fresh id per render those pile up and never clear — let our catch
       // block below show the error text in the output pane instead.
-      mermaid.initialize({ startOnLoad: false, suppressErrorRendering: true });
+      function initTheme(mode) {
+        mermaid.initialize({
+          startOnLoad: false,
+          suppressErrorRendering: true,
+          theme: 'base',
+          themeVariables: THEME_VARS[mode],
+        });
+      }
 
       // A single diagram that exercises most FMC features at once.
       const EXAMPLE = `fmc LR
@@ -193,7 +267,21 @@
         timer = setTimeout(render, 250);
       });
 
-      render();
+      // Theme: light is the default, regardless of the OS setting. The toggle flips
+      // the page chrome (html[data-theme]) and mermaid's theme variables, then
+      // re-renders. Dark ≡ `style stroke:#eee tint:black shade:white`.
+      const toggle = document.getElementById('theme-toggle');
+      let theme = 'light';
+      function setTheme(mode) {
+        theme = mode;
+        document.documentElement.dataset.theme = mode;
+        toggle.textContent = mode === 'dark' ? '☀ Light' : '🌙 Dark';
+        initTheme(mode);
+        render();
+      }
+      toggle.addEventListener('click', () => setTheme(theme === 'dark' ? 'light' : 'dark'));
+
+      setTheme('light');
     </script>
   </body>
 </html>
