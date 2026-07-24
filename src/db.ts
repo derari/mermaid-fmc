@@ -399,7 +399,7 @@ export const db = {
   },
 
   getDirection(): Direction {
-    return root.direction ?? 'TB';
+    return root.direction ?? 'LR';
   },
 
   // Toggles the `debug ports` overlay (root-only directive).

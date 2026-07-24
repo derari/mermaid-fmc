@@ -316,7 +316,7 @@ describe('routing (real ELK)', () => {
   // ELK edge could not dive across that boundary and the line was silently
   // dropped. It now routes through the ordinary crossing machinery.
   const nestedPortDiagram = [
-    'fmc',
+    'fmc tb',
     '  region',
     '    actor alice',
     '      --- p-bob',
@@ -351,7 +351,7 @@ describe('routing (real ELK)', () => {
   it('route depth:auto ELK-routes the nested end into the declared port via a chain', async () => {
     await render(
       [
-        'fmc',
+        'fmc tb',
         '  region',
         '    actor alice',
         '      --- p-bob',

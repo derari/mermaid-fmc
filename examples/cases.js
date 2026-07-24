@@ -2,19 +2,19 @@
 export const cases = [
   {
     title: 'Single actor',
-    code: `fmc
+    code: `fmc TB
   actor Bob`,
   },
   {
     title: 'Multiple actors',
-    code: `fmc
+    code: `fmc TB
   actor Bob
   actor Alice
   actor Web Server`,
   },
   {
     title: 'Nested actors',
-    code: `fmc
+    code: `fmc TB
   actor Bob
     actor Alice
     actor Carol
@@ -22,15 +22,15 @@ export const cases = [
     actor Mallory`,
   },
   {
-    title: 'Horizontal diagram (fmc LR)',
-    code: `fmc LR
+    title: 'Horizontal diagram (LR is the default)',
+    code: `fmc
   actor Bob
   actor Alice
   actor Carol`,
   },
   {
     title: 'Per-container direction',
-    code: `fmc LR
+    code: `fmc
   actor Frontend
     direction TB
     actor Web UI
@@ -42,7 +42,7 @@ export const cases = [
   },
   {
     title: 'Entity types',
-    code: `fmc LR
+    code: `fmc
   actor Client
   user User
   pipe
@@ -54,21 +54,21 @@ export const cases = [
   },
   {
     title: 'Storage with nested contents (horizontal)',
-    code: `fmc LR
-  storage Warehouse
-    actor Picker
-    actor Packer`,
-  },
-  {
-    title: 'Storage with nested contents (vertical)',
     code: `fmc
   storage Warehouse
     actor Picker
     actor Packer`,
   },
   {
+    title: 'Storage with nested contents (vertical)',
+    code: `fmc TB
+  storage Warehouse
+    actor Picker
+    actor Packer`,
+  },
+  {
     title: 'Queue/Pipe orientation (horizontal)',
-    code: `fmc LR
+    code: `fmc
   actor Producer
   queue Message Queue
   storage Store
@@ -86,7 +86,7 @@ export const cases = [
   },
   {
     title: 'Request orientation',
-    code: `fmc LR
+    code: `fmc
   request w
   request
   region TB
@@ -95,7 +95,7 @@ export const cases = [
   },
   {
     title: 'Labels: name vs. caption',
-    code: `fmc LR
+    code: `fmc
   actor ui "Web UI"
   storage db "User Database"
     actor "worker (no name)"
@@ -104,7 +104,7 @@ export const cases = [
   },
   {
     title: 'Labels: connectors and a region heading',
-    code: `fmc LR
+    code: `fmc
   region grp "Ingest Group"
     actor producer "Producer"
     channel bus "Bus"
@@ -116,7 +116,7 @@ export const cases = [
   },
   {
     title: 'Labels: wide connector caption reserves room (LR)',
-    code: `fmc LR
+    code: `fmc
   actor A
   channel bus "A Very Wide Message Bus Label"
   actor B
@@ -142,20 +142,20 @@ export const cases = [
   },
   {
     title: 'Labels: a short queue keeps its bar shape',
-    code: `fmc LR
+    code: `fmc
   queue q "x"
   queue q2 ""`,
   },
   {
     title: 'User: stick figure with a bottom label',
-    code: `fmc LR
+    code: `fmc
   user Customer
   storage Orders
   Customer --> Orders`,
   },
   {
     title: 'User: with an icon (double size) instead of the figure',
-    code: `fmc LR
+    code: `fmc
   user admin ""
     style icon:lucide:shield-user
   storage db "Database"
@@ -164,7 +164,7 @@ export const cases = [
   },
   {
     title: 'Depth tint (background darkens with nesting)',
-    code: `fmc
+    code: `fmc TB
   actor Level 0
     actor Level 1
       actor Level 2
@@ -172,7 +172,7 @@ export const cases = [
   },
   {
     title: 'Absolute lines (the three connectors)',
-    code: `fmc LR
+    code: `fmc
   actor A
   storage B
   actor C
@@ -183,14 +183,14 @@ export const cases = [
   },
   {
     title: 'Relative lines (source is the enclosing entity)',
-    code: `fmc LR
+    code: `fmc
   actor Client
     --> Server
   storage Server`,
   },
   {
     title: 'Two actors communicating through an unnamed channel',
-    code: `fmc LR
+    code: `fmc
   actor Producer
   channel
     Producer -->
@@ -199,7 +199,7 @@ export const cases = [
   },
   {
     title: 'Named connector as an absolute-line endpoint (name not drawn)',
-    code: `fmc LR
+    code: `fmc
   actor Client
   channel Wire
   actor Server
@@ -208,7 +208,7 @@ export const cases = [
   },
   {
     title: 'A line crossing container boundaries',
-    code: `fmc
+    code: `fmc TB
   actor Frontend
     actor Router
   storage Backend
@@ -217,7 +217,7 @@ export const cases = [
   },
   {
     title: 'Invalid lines (same primary type) are bold red',
-    code: `fmc LR
+    code: `fmc
   actor Client
   storage Store
   actor Peer
@@ -228,14 +228,14 @@ export const cases = [
   },
   {
     title: 'Complex line: auto-inserted channel between two actors',
-    code: `fmc LR
+    code: `fmc
   actor Producer
   actor Consumer
   Producer --> o --> Consumer`,
   },
   {
     title: 'Complex line: connector lands in a same-family container',
-    code: `fmc LR
+    code: `fmc
   actor Outside
   storage Disk
     actor Worker
@@ -243,21 +243,21 @@ export const cases = [
   },
   {
     title: 'Complex line (relative): source is the enclosing entity',
-    code: `fmc LR
+    code: `fmc
   actor Client
     --> o <-- Server
   actor Server`,
   },
   {
     title: 'Complex line with a pipe (| glyph) between two storages',
-    code: `fmc LR
+    code: `fmc
   storage Source
   storage Sink
   Source --> | --> Sink`,
   },
   {
     title: 'Complex line with a queue (q) and requests (r, rx, <r)',
-    code: `fmc LR
+    code: `fmc
   actor Client
   actor API
   Client --> q --> API
@@ -267,7 +267,7 @@ export const cases = [
   },
   {
     title: 'Complex lines sharing one connector to the same target',
-    code: `fmc LR
+    code: `fmc
   actor A
   actor B
   actor Hub
@@ -276,7 +276,7 @@ export const cases = [
   },
   {
     title: 'Complex line: an unbounded chain mixing named entities and glyphs',
-    code: `fmc LR
+    code: `fmc
   actor Parent 1
     actor Actor
     port P1 e
@@ -305,7 +305,7 @@ export const cases = [
   },
   {
     title: 'Color: bare style nested under the node it targets',
-    code: `fmc
+    code: `fmc TB
   storage Warehouse
     style tint:#1565c0
     actor Picker
@@ -313,7 +313,7 @@ export const cases = [
   },
   {
     title: 'Color: stroke inherited by a node and its inner line',
-    code: `fmc LR
+    code: `fmc
   actor Frontend
     style stroke:#8e24aa
     direction TB
@@ -324,7 +324,7 @@ export const cases = [
   },
   {
     title: 'Color: line stroke set inline, styled complex connector',
-    code: `fmc LR
+    code: `fmc
   actor Producer
   actor Consumer
   Producer --> o --> Consumer
@@ -351,7 +351,7 @@ export const cases = [
   },
   {
     title: 'Icons: line-height icon before the label',
-    code: `fmc LR
+    code: `fmc
   actor web "Web Server"
     style icon:lucide:server
   storage db "Database"
@@ -367,7 +367,7 @@ export const cases = [
   },
   {
     title: 'Icons: label-less, childless box draws a big icon',
-    code: `fmc LR
+    code: `fmc
   storage a ""
     style icon:lucide:cloud
   pipe b
@@ -380,7 +380,7 @@ export const cases = [
   },
   {
     title: 'Icons: in the label band',
-    code: `fmc LR
+    code: `fmc
   storage Backend
     direction TB
     style icon:lucide:server
@@ -396,7 +396,7 @@ export const cases = [
   },
   {
     title: 'Icons: icon-size (s/m/l/xl and a big icon beside its label)',
-    code: `fmc LR
+    code: `fmc
   actor s "Small"
     style icon:lucide:server icon-size:s
   actor m "Medium"
@@ -412,7 +412,7 @@ export const cases = [
   },
   {
     title: 'Region: wrapping in regions is invisible (matches the plain form)',
-    code: `fmc
+    code: `fmc TB
   actor Parent
     region
       actor Alice
@@ -470,7 +470,7 @@ export const cases = [
   },
   {
     title: 'Region: a styled region at root pads around its children',
-    code: `fmc
+    code: `fmc TB
   region
     style fill:#ffcdd2
     actor bob`,
@@ -580,7 +580,7 @@ export const cases = [
   },
   {
     title: 'Route: INCLUDE_CHILDREN inside + exit:e out to a sibling',
-    code: `fmc lr
+    code: `fmc
   debug ports
   region Big tb
     region Top tb
@@ -615,7 +615,7 @@ export const cases = [
   },
   {
     title: 'Port: a child wires to its container edge, the port on to a sibling',
-    code: `fmc lr
+    code: `fmc
   debug ports
   actor Service
     port Out e
@@ -626,7 +626,7 @@ export const cases = [
   },
   {
     title: 'Port: named ports on two containers, referenced by absolute lines',
-    code: `fmc lr
+    code: `fmc
   debug ports
   actor Frontend
     port Send e
@@ -640,7 +640,7 @@ export const cases = [
   },
   {
     title: 'Port: invalid — both faces actor, so the lines go red',
-    code: `fmc lr
+    code: `fmc
   actor Peer
   actor Service
     actor Worker
@@ -650,7 +650,7 @@ export const cases = [
   },
   {
     title: 'Port: invalid — an arrowhead landing on a port',
-    code: `fmc lr
+    code: `fmc
   storage Database
   actor Service
     actor Worker
@@ -660,7 +660,7 @@ export const cases = [
   },
   {
     title: 'Port: invalid — a dangling port (inner face empty)',
-    code: `fmc lr
+    code: `fmc
   debug ports
   storage Database
   actor Server
@@ -670,14 +670,14 @@ export const cases = [
   },
   {
     title: 'Multiplicity: `*` (small shadow) vs `...` (larger shadow + corner dots)',
-    code: `fmc lr
+    code: `fmc
   actor* Servers
   storage... Shards
   Servers --> Shards`,
   },
   {
     title: 'Multiplicity: `...` on a container with children and a line in',
-    code: `fmc lr
+    code: `fmc
   storage... Pool
     direction tb
     actor Worker
@@ -687,7 +687,7 @@ export const cases = [
   },
   {
     title: 'Multiplicity: `...` dots only (no shadow) on connectors, queue, region',
-    code: `fmc lr
+    code: `fmc
   region... Cluster
     style fill:#e3f2fd
     actor Node

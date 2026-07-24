@@ -1224,9 +1224,9 @@ describe('fmc parser', () => {
   });
 
   describe('direction', () => {
-    it('defaults to TB', () => {
+    it('defaults to LR', () => {
       parser.parse('fmc\n  actor Bob');
-      expect(db.getDirection()).toBe('TB');
+      expect(db.getDirection()).toBe('LR');
     });
 
     it('reads diagram direction from the header', () => {

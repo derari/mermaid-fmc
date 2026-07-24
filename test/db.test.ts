@@ -65,16 +65,16 @@ describe('root entity', () => {
     expect(db.getEntities()).toEqual([a]);
   });
 
-  it('backs the diagram direction with the root entity (default TB)', () => {
-    expect(db.getDirection()).toBe('TB');
-    db.setDirection('LR'); // no target -> the diagram default
+  it('backs the diagram direction with the root entity (default LR)', () => {
     expect(db.getDirection()).toBe('LR');
-    expect(db.getRoot().direction).toBe('LR');
+    db.setDirection('TB'); // no target -> the diagram default
+    expect(db.getDirection()).toBe('TB');
+    expect(db.getRoot().direction).toBe('TB');
     // A target still sets that entity's own direction, not the diagram default.
     const a = db.addEntity('A', 'actor');
     db.setDirection('RL', a);
     expect(a.direction).toBe('RL');
-    expect(db.getDirection()).toBe('LR');
+    expect(db.getDirection()).toBe('TB');
   });
 
   it('exposes the root entity own style as the diagram-wide default style', () => {
@@ -90,7 +90,7 @@ describe('root entity', () => {
     db.clear();
     expect(db.getRoot()).not.toBe(first);
     expect(db.getEntities()).toEqual([]);
-    expect(db.getDirection()).toBe('TB');
+    expect(db.getDirection()).toBe('LR');
     expect(db.getRootStyle()).toEqual({});
   });
 });

@@ -106,7 +106,7 @@ describe('request rendering', () => {
   });
 
   it('auto orientation points downstream of a vertical flow (TB → south)', async () => {
-    await render('fmc\n  request Down');
+    await render('fmc TB\n  request Down');
     expect(arrowGroup()?.attrs['transform']).toContain('rotate(90)');
   });
 
@@ -117,7 +117,7 @@ describe('request rendering', () => {
 
   it('auto orientation follows the enclosing container, not the diagram default', async () => {
     // Diagram flows TB, but the request sits in an RL region → arrow points west.
-    await render(['fmc', '  region R rl', '    request Inner'].join('\n'));
+    await render(['fmc TB', '  region R rl', '    request Inner'].join('\n'));
     expect(arrowGroup()?.attrs['transform']).toContain('rotate(180)');
   });
 
@@ -128,7 +128,7 @@ describe('request rendering', () => {
   });
 
   it('back orientation points opposite the flow (TB → north)', async () => {
-    await render('fmc\n  request Up back');
+    await render('fmc TB\n  request Up back');
     expect(arrowGroup()?.attrs['transform']).toContain('rotate(270)');
   });
 });
