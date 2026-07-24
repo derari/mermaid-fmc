@@ -139,6 +139,42 @@ describe('routing (real ELK)', () => {
     expect(heads()).toBe(1);
   });
 
+  it('chains a declared port nested below the LCA, joining by ELK without throwing', async () => {
+    // `alice` is a declared port on `region LR`, itself inside `extra` — one level
+    // below the root LCA. With depth high enough the fixed port grows a routing
+    // port on `extra` (not on its own container) and ELK-joins Bob's chain at the
+    // root, instead of a hand-drawn bridge. Regression for the fixed-port chain.
+    await render(
+      [
+        'fmc tb',
+        '  debug ports',
+        '  route depth:99',
+        '  region',
+        '    actor a-bob',
+        '      -- alice',
+        '  region extra',
+        '    region LR',
+        '      port alice w',
+        '        --r-- a-alice',
+        '      actor a-alice',
+      ].join('\n'),
+    );
+    const rects: El[] = [];
+    const walk = (e: El): void => {
+      if (e.nodeName === 'rect') rects.push(e);
+      e.children.forEach(walk);
+    };
+    walk(svg);
+    const ports = rects.filter((r) => (r.attrs.class ?? '').startsWith('fmc-port'));
+    const declared = ports.filter((r) => r.attrs.class?.includes('fmc-port-declared')).length;
+    const router = ports.filter((r) => r.attrs.class === 'fmc-port').length;
+    // One declared port (alice) plus TWO router ports: one on Bob's region and one
+    // on `extra` — the latter is what the fix adds (proof the fixed port chained up
+    // its enclosing container rather than bridging from depth 0).
+    expect(declared).toBe(1);
+    expect(router).toBe(2);
+  });
+
   it('hand-routes the whole line at depth:0 (single polyline, one head)', async () => {
     await render(
       [

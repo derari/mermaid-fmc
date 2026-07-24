@@ -178,13 +178,19 @@ export interface RouteInput {
 // with an ELK edge climbing endpoint -> port -> port (one level per hop). Every
 // segment starts with no arrowhead; the caller sets the head on the touch segment.
 //
-// `seedIsPort` marks an endpoint that is ALREADY a fixed port (a declared `port`),
-// so a chainless side (depth 0) anchors on the port point rather than a box. A
-// fixed port is only ever passed at depth 0 — it never grows routing ports of its
-// own — so the endpoint here is that port's id, used directly as the anchor.
+// `owner` is the node/container whose enclosing containers the chain climbs. For
+// a plain node it equals `endpointId`. For a declared `port` it is the port's
+// CONTAINER, not the port id: the port already sits on that container's boundary
+// (it IS that level's exit), so the chain climbs from the container's parent
+// outward — a routing port on each ancestor, never a redundant one on the port's
+// own container. This lets a port nested below the LCA still chain up to it.
+//
+// `seedIsPort` marks an endpoint that is a fixed port (a declared `port`), so a
+// chainless side (depth 0) anchors on the port point rather than a box.
 function planChain(
   prefix: string,
   endpointId: string,
+  owner: string,
   depth: number,
   nestingDistance: number,
   side: Side,
@@ -203,7 +209,7 @@ function planChain(
   const ports: PortSpec[] = [];
   const segments: Segment[] = [];
   let from = endpointId;
-  enclosingContainers(endpointId, depth).forEach((containerId, level) => {
+  enclosingContainers(owner, depth).forEach((containerId, level) => {
     const portId = `${prefix}p${level}`;
     ports.push({ containerId, portId, side });
     segments.push({ id: `${prefix}${level}`, from, to: portId, container: containerId, arrow: 'none' });
@@ -246,17 +252,21 @@ export function planRoute(input: RouteInput): RoutePlan {
       ? Number.POSITIVE_INFINITY
       : routing.depth ?? 1
     : 0;
-  // A fixed (declared) port is pinned at depth 0 — it never grows routing ports of
-  // its own; the free side chains toward it and honors the requested depth
-  // (default 0 → a hand-drawn bridge to the port point, as for a node endpoint).
-  const depthSrc = sourceFixed ? 0 : Math.max(0, Math.min(requested, srcND));
-  const depthTgt = targetFixed ? 0 : Math.max(0, Math.min(requested, tgtND));
+  // Every side — including a declared port — chains up to the requested depth,
+  // capped by its nesting distance. A fixed port grows no routing port on its OWN
+  // container (the declared port already sits there; planChain climbs from the
+  // container's parent), but it DOES chain through its enclosing containers, so a
+  // port nested below the LCA can still reach it instead of forcing a bridge.
+  // Default depth 0 → no chain → a hand-drawn bridge to the port point, as for a
+  // node endpoint.
+  const depthSrc = Math.max(0, Math.min(requested, srcND));
+  const depthTgt = Math.max(0, Math.min(requested, tgtND));
   const bend = routing ? routing.bend ?? 'z' : undefined;
 
   const exitSide = resolveExitSide(routing?.exit, sourceOwner, targetOwner, lca, lcaDir);
   const enterSide = resolveEnterSide(routing?.enter, exitSide);
-  const source = planChain(`${connId}s`, sourceId, depthSrc, srcND, exitSide, sourceFixed);
-  const target = planChain(`${connId}t`, targetId, depthTgt, tgtND, enterSide, targetFixed);
+  const source = planChain(`${connId}s`, sourceId, sourceOwner, depthSrc, srcND, exitSide, sourceFixed);
+  const target = planChain(`${connId}t`, targetId, targetOwner, depthTgt, tgtND, enterSide, targetFixed);
 
   // The head sits on whichever segment touches the line's arrow end. A chain's
   // touch segment runs endpoint -> port, so the endpoint is that polyline's START

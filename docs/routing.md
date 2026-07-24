@@ -244,24 +244,29 @@ instead of the router picking one. So a line touching a declared port takes the
 separate path.
 
 The one twist: a declared port is a **fixed anchor**. It already sits on its
-container's boundary, so it never grows a routing-port chain of its own — its side
-is pinned at `depth 0`, and the *other* endpoint chains toward it. Concretely, in
-`planRoute` a declared-port endpoint contributes:
+container's boundary, so it grows no routing port on *that* container — the
+declared port already is that level's exit. But it still chains through its
+**enclosing** containers like any target: from the container's parent outward, a
+routing port per level up to `depth`, so a port nested below the LCA can still
+reach it. Concretely, in `planRoute` a declared-port endpoint contributes:
 
 - its **owner** (the port's container) for all the crossing/nesting math — so a
   two-segment-deep port id like `n1.port0` still counts as sitting at `n1`'s level;
-- its **port id** as the ELK anchor and bridge point;
-- `fixed: true`, which forces its `depth` to 0.
+- its **port id** as the ELK anchor and bridge point, and as the innermost link of
+  its chain (the first hop climbs from the port to a routing port on the owner's
+  parent);
+- `fixed: true`, so `planChain` seeds the chain from the owner's parent, not the
+  port's own container.
 
 Everything then falls out of the existing rules. A non-crossing port line is
 `plain`. A crossing one whose subtree is uniform still `flatten`s (invisible, as
-always). A crossing one through mixed directions is `manual`: the free side chains
-per `depth` (default 0 → a hand-drawn bridge straight to the port point, exactly
-as a node endpoint would; `depth:auto` → an ELK-routed chain that joins the port
-in the LCA). If the declared port's *own* container is nested below the LCA, its
-fixed side simply doesn't reach the LCA, so the two ends meet with a bridge — the
-same fallback the `depth` dial already produces. No extra machinery, and every
-container keeps its direction.
+always). A crossing one through mixed directions is `manual`: both sides chain per
+`depth` (default 0 → a hand-drawn bridge straight to the port point, exactly as a
+node endpoint would; `depth:auto` → an ELK-routed chain that joins the port in the
+LCA). If the declared port's own container is nested below the LCA, the port chains
+up through the levels in between to reach it — and only falls back to a bridge when
+`depth` stops the chain short, the same dial every line uses. No extra machinery,
+and every container keeps its direction.
 
 ## Status
 

@@ -357,15 +357,34 @@ describe('planRoute with a declared-port endpoint', () => {
     expect(plan.join).toMatchObject({ from: 'conn0sp0', to: 'n1.port0', container: '' });
   });
 
-  it('never grows routing ports on the fixed side, even at depth:auto with a nested port', () => {
-    // The declared port hangs off n1.0 (itself nested below the root LCA). The
-    // fixed side is still pinned at depth 0 — it does not reach the LCA — so the
-    // join is a bridge from the free chain to the port point.
+  it('chains a fixed port nested below the LCA through its enclosing containers', () => {
+    // The declared port hangs off n1.0, itself one level below the root LCA. The
+    // fixed side grows no port on its own container (the declared port is already
+    // there) but chains from that container's parent (n1) up to the LCA, so it
+    // reaches the LCA and the two sides meet with an ELK edge — no bridge.
     const plan = planRoute({
       ...aliceToPort,
       targetId: 'n1.0.port0',
       targetOwner: 'n1.0',
       routing: { depth: 'auto' },
+    });
+    if (plan.kind !== 'manual') throw new Error('manual');
+    expect(plan.target.ports).toEqual([{ containerId: 'n1', portId: 'conn0tp0', side: 'n' }]);
+    // the chain's first hop starts from the declared port, not a new port on n1.0.
+    expect(plan.target.segments[0]).toMatchObject({ from: 'n1.0.port0', to: 'conn0tp0', container: 'n1' });
+    expect(plan.join.kind).toBe('elk');
+    if (plan.join.kind !== 'elk') return;
+    expect(plan.join).toMatchObject({ from: 'conn0sp0', to: 'conn0tp0', container: '' });
+  });
+
+  it('a nested fixed port still bridges when depth stops the chain short of the LCA', () => {
+    // depth:0 → the fixed port grows no chain and stays pinned at its point; the
+    // free side bridges to it (the default when no depth is requested).
+    const plan = planRoute({
+      ...aliceToPort,
+      targetId: 'n1.0.port0',
+      targetOwner: 'n1.0',
+      routing: { depth: 0 },
     });
     if (plan.kind !== 'manual') throw new Error('manual');
     expect(plan.target.ports).toEqual([]);
