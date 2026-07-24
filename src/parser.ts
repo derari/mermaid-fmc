@@ -588,13 +588,19 @@ export const parser = {
           }
         }
 
-        // Connectors (channel, pipe), ports, and queues are leaves: rejecting a
-        // nested child here gives a clear error rather than silently drawing
-        // something invalid. (The root is a region, so it never trips this.)
-        if (CHILDLESS_SUBTYPES.has(parent.subtype)) {
-          throw new Error(
-            `fmc: a ${parent.subtype} cannot contain nested entities (found "${line}")`,
-          );
+        // Connectors (channel, pipe), queues, and users are leaves: they cannot
+        // hold nested boxes. They CAN, however, carry `port`s — a port is not a
+        // nested box but a connection anchor pinned to the parent's edge, which
+        // the renderer builds while keeping the box a leaf (see declaredPorts). So
+        // only a non-port child is rejected here. A `port` parent is the one
+        // exception: it has no box of its own for a port to pin to, so it rejects
+        // everything. (The root is a region, so it never trips this.)
+        if (
+          CHILDLESS_SUBTYPES.has(parent.subtype) &&
+          (subtype !== 'port' || parent.subtype === 'port')
+        ) {
+          const what = subtype === 'port' ? 'ports' : 'nested entities';
+          throw new Error(`fmc: a ${parent.subtype} cannot contain ${what} (found "${line}")`);
         }
 
         const node = db.addEntity(name, subtype, parent);

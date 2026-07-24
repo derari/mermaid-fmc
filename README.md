@@ -2,6 +2,7 @@
 
 An [FMC (Fundamental Modeling Concepts)](http://www.fmc-modeling.org/) diagram
 type for [Mermaid](https://mermaid.js.org/), shipped as an external diagram plugin.
+Try it in the [live editor](https://derari.github.io/mermaid-fmc/editor).
 
 ## Usage
 

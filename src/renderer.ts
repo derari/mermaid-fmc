@@ -44,6 +44,13 @@ const LABEL_PAD_X = 20; // horizontal breathing room around a leaf label
 const CONTAINER_LABEL_BAND = 30; // top padding reserved for a container's label
 const CONTAINER_PAD = 12; // left/right/bottom padding inside a container
 const NODE_SPACING = 24; // gap between sibling boxes
+const LINE_CORNER_RADIUS = 10; // corner radius for a connection's bends (clamped per corner)
+// A narrow S-bend (two 90° corners joined by a short jog) is replaced by a single
+// short diagonal so the line changes lanes smoothly instead of kinking. See
+// diagonalizeSteps: the diagonal's setback targets the corner radius, is never
+// shallower than DIAGONAL_MIN_ANGLE, and reserves a corner radius of perpendicular
+// run at a line end so the line leaves a box square and then curves into the diagonal.
+const DIAGONAL_MIN_ANGLE = (20 * Math.PI) / 180; // shallowest diagonal we allow (radians)
 
 // A multiplicity marker signals several instances with content offset diagonally
 // past the entity's bottom-right corner (down and to the right): a same-size,
@@ -986,9 +993,9 @@ function drawEdges(
     const section = edge.sections?.[0];
     if (!section) continue;
 
-    const points = [section.startPoint, ...(section.bendPoints ?? []), section.endPoint]
-      .map((p) => `${originX + p.x},${originY + p.y}`)
-      .join(' ');
+    const points = [section.startPoint, ...(section.bendPoints ?? []), section.endPoint].map(
+      (p) => ({ x: originX + p.x, y: originY + p.y }),
+    );
     drawEdgePolyline(svg, points, style, markers);
   }
 
@@ -997,17 +1004,20 @@ function drawEdges(
   }
 }
 
-// Draws one connection polyline: the `fmc-edge` (plus `-invalid`) class, an
-// inline stroke override when the line carries a color, and the matching
-// arrowhead marker on the head end. Shared by ELK-routed and hand-routed edges.
+// Draws one connection as a rounded `path`: the `fmc-edge` (plus `-invalid`)
+// class, an inline stroke override when the line carries a color, and the
+// matching arrowhead marker on the head end. Shared by ELK-routed and
+// hand-routed edges. Corners are rounded (see roundedPath) with the radius
+// clamped per corner, so a tight S-bend curves smoothly instead of overshooting.
 function drawEdgePolyline(
   svg: SVGSVGElement,
-  points: string,
+  points: Pt[],
   style: ConnStyle,
   markers: Markers,
 ): void {
   const cls = style.invalid ? 'fmc-edge fmc-edge-invalid' : 'fmc-edge';
-  const line = svgEl('polyline', { points, class: cls });
+  const shaped = diagonalizeSteps(points, LINE_CORNER_RADIUS);
+  const line = svgEl('path', { d: roundedPath(shaped, LINE_CORNER_RADIUS), class: cls });
   if (style.stroke) line.setAttribute('style', `stroke:${style.stroke}`);
 
   const markerId = style.invalid
@@ -1075,8 +1085,121 @@ function orthogonalPoints(s: AbsRect, t: AbsRect, bend?: 'z' | 'n' | 'auto'): Pt
   return [{ x: sx, y: scy }, { x: midX, y: scy }, { x: midX, y: tcy }, { x: tx, y: tcy }];
 }
 
-function toPolyline(pts: Pt[]): string {
-  return pts.map((p) => `${p.x},${p.y}`).join(' ');
+// Whether a→v→w→b is a "step": two parallel, same-direction runs (a→v and w→b)
+// joined by a short perpendicular jog (v→w) below `maxJog`. This is the narrow
+// S-bend a diagonal smooths; an L-turn (one corner) or a U-turn (runs facing
+// opposite ways) is not a step and is left alone. Axis-alignment is tested with a
+// small epsilon since ELK coordinates are floats.
+function isStep(a: Pt, v: Pt, w: Pt, b: Pt, maxJog: number): boolean {
+  const EPS = 1e-6;
+  const av = { x: v.x - a.x, y: v.y - a.y };
+  const vw = { x: w.x - v.x, y: w.y - v.y };
+  const wb = { x: b.x - w.x, y: b.y - w.y };
+  const horiz = (p: Pt): boolean => Math.abs(p.y) < EPS && Math.abs(p.x) > EPS;
+  const vert = (p: Pt): boolean => Math.abs(p.x) < EPS && Math.abs(p.y) > EPS;
+  if (horiz(av) && horiz(wb) && vert(vw)) {
+    return Math.sign(av.x) === Math.sign(wb.x) && Math.abs(vw.y) < maxJog;
+  }
+  if (vert(av) && vert(wb) && horiz(vw)) {
+    return Math.sign(av.y) === Math.sign(wb.y) && Math.abs(vw.x) < maxJog;
+  }
+  return false;
+}
+
+// Rewrites every narrow step in an orthogonal point list into a short diagonal,
+// so a tight S-bend reads as a single lane-change rather than a rounded kink. For
+// each step, the diagonal starts `d` back along one run and ends `d` along the
+// next; `d` targets the corner radius but is clamped three ways:
+//   - to the run it sits on — a terminal run (a line end) keeps only a PERP_STUB
+//     so the box exit stays square ("the first pixel is a right angle"); an
+//     interior run is shared with a neighbouring corner, so it yields at most half;
+//   - so the diagonal is never shallower than DIAGONAL_MIN_ANGLE (a near-flat ramp
+//     reads as a wobble): the total run-back is capped at jog / tan(minAngle).
+// roundedPath then rounds the two shallower corners exactly as it does any others,
+// so no new curve maths is needed. Shared by every edge — hand-routed and ELK.
+export function diagonalizeSteps(pts: Pt[], radius: number): Pt[] {
+  if (pts.length < 4) return pts;
+  const maxJog = 2 * radius; // above this, two plain rounded 90° corners fit fine
+  const minAngleTan = Math.tan(DIAGONAL_MIN_ANGLE);
+  const out: Pt[] = [pts[0]];
+  let i = 1;
+  while (i < pts.length - 1) {
+    const a = pts[i - 1];
+    const v = pts[i];
+    const w = pts[i + 1];
+    const b = pts[i + 2] as Pt | undefined;
+    if (!b || !isStep(a, v, w, b, maxJog)) {
+      out.push(v);
+      i++;
+      continue;
+    }
+    const jog = Math.hypot(w.x - v.x, w.y - v.y);
+    const runA = Math.hypot(v.x - a.x, v.y - a.y);
+    const runB = Math.hypot(b.x - w.x, b.y - w.y);
+    // A run that ends at the whole line's start/end keeps a square exit: reserve a
+    // full corner radius of perpendicular run before the diagonal, so the line
+    // leaves the box at 90° and then curves in (rather than shooting off at an
+    // angle). An interior run is shared with its other corner, so it yields at most
+    // half. When a terminal run is shorter than the radius the whole run is kept
+    // perpendicular (setback 0) and only the far side bends into the diagonal.
+    const availA = i - 1 === 0 ? Math.max(0, runA - radius) : runA / 2;
+    const availB = i + 2 === pts.length - 1 ? Math.max(0, runB - radius) : runB / 2;
+    let d0 = Math.min(radius, availA);
+    let d1 = Math.min(radius, availB);
+    // Keep the diagonal at least DIAGONAL_MIN_ANGLE: its horizontal spread (d0+d1)
+    // may be at most jog / tan(minAngle); scale both back together if it exceeds it.
+    const maxTotal = jog / minAngleTan;
+    const total = d0 + d1;
+    if (total > maxTotal && total > 0) {
+      const k = maxTotal / total;
+      d0 *= k;
+      d1 *= k;
+    }
+    const uA = { x: (v.x - a.x) / runA, y: (v.y - a.y) / runA };
+    const uB = { x: (b.x - w.x) / runB, y: (b.y - w.y) / runB };
+    out.push({ x: v.x - d0 * uA.x, y: v.y - d0 * uA.y });
+    out.push({ x: w.x + d1 * uB.x, y: w.y + d1 * uB.y });
+    i += 2; // both jog vertices consumed
+  }
+  for (; i < pts.length; i++) out.push(pts[i]);
+  return out;
+}
+
+// Exported for unit testing (the clamp behaviour on tight bends).
+// Builds an SVG path `d` for an orthogonal point list, rounding every interior
+// corner. Each vertex is replaced by a quadratic curve: back off `t` along both
+// incident segments to the tangent points, then arc through the vertex. `t` is
+// clamped to half of each adjacent segment (`min(radius, in/2, out/2)`), so when
+// a segment is shared by two corners — the short middle run of a tight S-bend —
+// neither corner can eat past its midpoint. The two arcs meet cleanly instead of
+// overshooting into a self-crossing loop, and a stub can never round past its own
+// endpoint (so heads/box edges stay attached). Collinear or zero-length vertices
+// pass straight through.
+export function roundedPath(pts: Pt[], radius: number): string {
+  if (pts.length === 0) return '';
+  if (pts.length < 3) return `M ${pts.map((p) => `${p.x},${p.y}`).join(' L ')}`;
+
+  let d = `M ${pts[0].x},${pts[0].y}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = pts[i - 1];
+    const v = pts[i];
+    const b = pts[i + 1];
+    const din = Math.hypot(v.x - a.x, v.y - a.y);
+    const dout = Math.hypot(b.x - v.x, b.y - v.y);
+    if (din === 0 || dout === 0) {
+      d += ` L ${v.x},${v.y}`;
+      continue;
+    }
+    const t = Math.min(radius, din / 2, dout / 2);
+    const inx = v.x - (t * (v.x - a.x)) / din;
+    const iny = v.y - (t * (v.y - a.y)) / din;
+    const outx = v.x + (t * (b.x - v.x)) / dout;
+    const outy = v.y + (t * (b.y - v.y)) / dout;
+    d += ` L ${inx},${iny} Q ${v.x},${v.y} ${outx},${outy}`;
+  }
+  const last = pts[pts.length - 1];
+  d += ` L ${last.x},${last.y}`;
+  return d;
 }
 
 function arrowMarker(id: string, className: string): SVGMarkerElement {
@@ -1723,7 +1846,7 @@ export const renderer = {
         const from = resolve(edge.from);
         const to = resolve(edge.to);
         if (from && to) {
-          drawEdgePolyline(svg, toPolyline(orthogonalPoints(from, to, edge.bend)), edge.style, markers);
+          drawEdgePolyline(svg, orthogonalPoints(from, to, edge.bend), edge.style, markers);
         }
       }
     }

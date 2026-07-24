@@ -50,11 +50,13 @@ export const CONNECTOR_SUBTYPES: ReadonlySet<EntitySubtype> = new Set<EntitySubt
   ['pipe', 'channel', 'request', 'port'],
 );
 
-// Leaves that cannot contain nested entities (only lines). This is a superset of
-// the connectors: a `queue` and a `user` are childless too, but — unlike a
+// Leaves that cannot contain nested boxes (only lines, and — since every one of
+// these is still a drawn box — `port`s pinned to their edges). This is a superset
+// of the connectors: a `queue` and a `user` are childless too, but — unlike a
 // connector — each is a full box that prints its name, so they are deliberately
 // kept OUT of CONNECTOR_SUBTYPES (which drives the unlabelled/glyph rules). The
-// parser keys its nesting check off this broader set.
+// parser keys its nesting check off this broader set, allowing only `port`
+// children through (and none at all under a `port`, which has no box to pin to).
 export const CHILDLESS_SUBTYPES: ReadonlySet<EntitySubtype> = new Set<EntitySubtype>(
   [...CONNECTOR_SUBTYPES, 'queue', 'user'],
 );

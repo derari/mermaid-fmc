@@ -309,6 +309,32 @@ describe('fmc parser', () => {
       );
     });
 
+    it('rejects a port nested inside a port (a port has no box to pin to)', () => {
+      expect(() => parser.parse('fmc\n  actor Box\n    port In w\n      port Deep n')).toThrow(
+        /port cannot contain ports/,
+      );
+    });
+
+    // A `port` is an edge anchor, not a nested box, so the otherwise-childless
+    // leaves (connectors, queue, user) may carry ports even though they reject
+    // every other child.
+    for (const parent of ['queue Q', 'channel C', 'pipe P', 'user U', 'request R']) {
+      const kind = parent.split(' ')[0];
+      it(`allows a port on a childless ${kind}`, () => {
+        parser.parse(['fmc', `  ${parent}`, '    port Out e'].join('\n'));
+        const [box] = db.getEntities();
+        expect(box.children).toEqual([
+          { name: 'Out', type: 'port', subtype: 'port', children: [], portSide: 'e' },
+        ]);
+      });
+
+      it(`still rejects a non-port child on a childless ${kind}`, () => {
+        expect(() => parser.parse(['fmc', `  ${parent}`, '    actor Nope'].join('\n'))).toThrow(
+          new RegExp(`${kind} cannot contain nested entities`),
+        );
+      });
+    }
+
     it('lets a line reference a port by name', () => {
       parser.parse(
         ['fmc', '  actor A', '  actor Box', '    port In w', '  A --> In'].join('\n'),

@@ -56,13 +56,14 @@ afterAll(() => {
   (globalThis as { document?: unknown }).document = origDocument;
 });
 
-// All <polyline> elements anywhere in the built SVG (edges are appended flat).
-function polylines(): El[] {
-  return svg.children.filter((e) => e.nodeName === 'polyline');
+// All edge <path> elements anywhere in the built SVG (edges are appended flat,
+// each carrying the fmc-edge class; other paths — arrowheads, glyphs — do not).
+function edges(): El[] {
+  return svg.children.filter((e) => e.nodeName === 'path' && !!e.attrs.class?.includes('fmc-edge'));
 }
-// Count of polylines carrying an arrowhead (a real line's single head).
+// Count of edges carrying an arrowhead (a real line's single head).
 function heads(): number {
-  return polylines().filter((p) => p.attrs['marker-start'] || p.attrs['marker-end']).length;
+  return edges().filter((p) => p.attrs['marker-start'] || p.attrs['marker-end']).length;
 }
 
 async function render(code: string): Promise<void> {
@@ -88,7 +89,7 @@ describe('routing (real ELK)', () => {
       ].join('\n'),
     );
     // Source and target chains + the ELK join = 3 polylines; exactly one head.
-    expect(polylines().length).toBe(3);
+    expect(edges().length).toBe(3);
     expect(heads()).toBe(1);
   });
 
@@ -117,7 +118,7 @@ describe('routing (real ELK)', () => {
     // Two real lines (A->S2 flattened, B->T ported+bridged): two heads total.
     expect(heads()).toBe(2);
     // B->T is a chain (B->port) + bridge + (T->port) = 3 polylines; A->S2 = 1.
-    expect(polylines().length).toBeGreaterThanOrEqual(4);
+    expect(edges().length).toBeGreaterThanOrEqual(4);
   });
 
   it('routes a two-level port chain out of nested containers without throwing', async () => {
@@ -135,7 +136,7 @@ describe('routing (real ELK)', () => {
       ].join('\n'),
     );
     // A->port(Inner) + port(Inner)->port(Outer) + join(->C) = 3 polylines, one head.
-    expect(polylines().length).toBe(3);
+    expect(edges().length).toBe(3);
     expect(heads()).toBe(1);
   });
 
@@ -189,7 +190,7 @@ describe('routing (real ELK)', () => {
         '    route depth:0',
       ].join('\n'),
     );
-    expect(polylines().length).toBe(1);
+    expect(edges().length).toBe(1);
     expect(heads()).toBe(1);
   });
 
@@ -207,9 +208,36 @@ describe('routing (real ELK)', () => {
         '  DB --- In',
       ].join('\n'),
     );
-    const ls = polylines();
+    const ls = edges();
     expect(ls.length).toBe(2);
     expect(ls.every((p) => p.attrs.class === 'fmc-edge')).toBe(true);
+  });
+
+  it('builds a declared port on a childless box (queue) and routes a line into it', async () => {
+    // A queue holds no nested boxes but may carry ports. Its unwired inner face
+    // borrows the queue's storage family (see portTypes), so an undirected line
+    // from an actor bridges the port cleanly and stays valid.
+    await render(
+      [
+        'fmc lr',
+        '  debug ports',
+        '  actor A',
+        '  queue Jobs',
+        '    port In w',
+        '  A --- In',
+      ].join('\n'),
+    );
+    const rects: El[] = [];
+    const walk = (e: El): void => {
+      if (e.nodeName === 'rect') rects.push(e);
+      e.children.forEach(walk);
+    };
+    walk(svg);
+    // The declared port rendered as a declared-port marker (proof it was built on
+    // the leaf queue), and the line to it routed as a single valid edge.
+    expect(rects.some((r) => r.attrs.class?.includes('fmc-port-declared'))).toBe(true);
+    expect(edges().length).toBe(1);
+    expect(edges()[0].attrs.class).toBe('fmc-edge');
   });
 
   it('draws a same-family port bridge as an invalid (red) edge', async () => {
@@ -218,7 +246,7 @@ describe('routing (real ELK)', () => {
     await render(
       ['fmc lr', '  actor A', '  actor Box', '    port In w', '  A --- In'].join('\n'),
     );
-    const ls = polylines();
+    const ls = edges();
     expect(ls.length).toBe(1);
     expect(ls[0].attrs.class).toBe('fmc-edge fmc-edge-invalid');
   });
@@ -238,7 +266,7 @@ describe('routing (real ELK)', () => {
     expect(bob!.attrs.class).not.toContain('fmc-container');
     // The port line still routes (one polyline for p--Alice), and bridges cleanly:
     // the inner face takes `actor` from Bob, the outer end is storage Alice — valid.
-    const ls = polylines();
+    const ls = edges();
     expect(ls.length).toBe(1);
     expect(ls[0].attrs.class).toBe('fmc-edge');
   });
@@ -256,8 +284,8 @@ describe('routing (real ELK)', () => {
       ].join('\n'),
     );
     // Two valid edges; the head sits on DB (away from the port), never on Out.
-    expect(polylines().length).toBe(2);
-    expect(polylines().every((p) => p.attrs.class === 'fmc-edge')).toBe(true);
+    expect(edges().length).toBe(2);
+    expect(edges().every((p) => p.attrs.class === 'fmc-edge')).toBe(true);
     expect(heads()).toBe(1);
   });
 
@@ -278,7 +306,7 @@ describe('routing (real ELK)', () => {
         '  Out --- In',
       ].join('\n'),
     );
-    const ls = polylines();
+    const ls = edges();
     expect(ls.length).toBe(3);
     expect(ls.every((p) => p.attrs.class === 'fmc-edge')).toBe(true);
   });
@@ -287,7 +315,7 @@ describe('routing (real ELK)', () => {
     await render(
       ['fmc lr', '  storage DB', '  actor Box', '    port In w', '  DB --> In'].join('\n'),
     );
-    const ls = polylines();
+    const ls = edges();
     expect(ls.length).toBe(1);
     expect(ls[0].attrs.class).toBe('fmc-edge fmc-edge-invalid');
   });
@@ -331,9 +359,9 @@ describe('routing (real ELK)', () => {
     // Default depth (like node crossings): alice--p-bob is one hand-drawn bridge;
     // the `-o- bob` complex line adds p-bob--channel and channel--bob. Three
     // polylines — the alice line is no longer dropped.
-    expect(polylines().length).toBe(3);
+    expect(edges().length).toBe(3);
     // All bridge cleanly (actor↔storage across the port), so none is red.
-    expect(polylines().every((p) => p.attrs.class === 'fmc-edge')).toBe(true);
+    expect(edges().every((p) => p.attrs.class === 'fmc-edge')).toBe(true);
   });
 
   it('preserves a sibling container\'s own direction when routing a nested port line', async () => {
@@ -341,8 +369,11 @@ describe('routing (real ELK)', () => {
     // The right region flows LR, so `bob` stays to the RIGHT of the channel it
     // connects to — a horizontal segment — rather than being stacked by a TB flow.
     await render(nestedPortDiagram);
-    const horizontal = polylines().some((p) => {
-      const pts = p.attrs.points.trim().split(/\s+/).map((s) => s.split(',').map(Number));
+    const horizontal = edges().some((p) => {
+      const pts = [...p.attrs.d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => [
+        Number(m[1]),
+        Number(m[2]),
+      ]);
       return pts.length >= 2 && pts.every((q) => q[1] === pts[0][1]);
     });
     expect(horizontal).toBe(true);
@@ -365,8 +396,8 @@ describe('routing (real ELK)', () => {
     // alice now climbs out through a routed port (1 chain segment) that ELK-joins
     // the declared port (1 join edge) = 2 polylines for that line, + 2 for the
     // channel = 4. Directions are still preserved (no flattening).
-    expect(polylines().length).toBe(4);
-    expect(polylines().every((p) => p.attrs.class === 'fmc-edge')).toBe(true);
+    expect(edges().length).toBe(4);
+    expect(edges().every((p) => p.attrs.class === 'fmc-edge')).toBe(true);
   });
 
   it('renders an undirected mixed cross line with no head', async () => {
@@ -384,6 +415,6 @@ describe('routing (real ELK)', () => {
       ].join('\n'),
     );
     expect(heads()).toBe(0);
-    expect(polylines().length).toBe(3);
+    expect(edges().length).toBe(3);
   });
 });
